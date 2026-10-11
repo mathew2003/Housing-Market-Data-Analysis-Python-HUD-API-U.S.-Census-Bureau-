@@ -1,0 +1,126 @@
+---
+title: "FinalProject - Mathew Scaria"
+output:
+  pdf_document: default
+  html_document: default
+date: "2026-05-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+Research Question: How do Vacancy Rates Affect Fair Market Rent?  
+
+Motivation: This is an important research topic because vacancy rates and fair market rent are closely tied to housing affordability, urban development, and economic stability. Understanding this relationship can help policymakers, landlords, and renters better understand how housing markets function.
+
+**Variables:**
+
+Dependent Variable: fmr_2bed (Rent for a 2 bedroom rental unit)
+
+Independent Variable: vacancy_rate (The percent of rental units that are vacant for rent)
+
+Controls:
+
+total_housing_units (Total number of rental units this includes apartments, houses, etc)
+
+median_income (People's Income in dollars)
+
+households_with_children (The number of families that have children under 18)
+
+---
+
+## 1. Importing my Data
+
+```{r}
+library(dplyr)
+library(stargazer)
+
+FinalData <- read.csv("FinalProjectdataset.csv") #giving my data a name
+
+head(FinalData) #This lets me see the first couple rows of data
+```
+
+```{r}
+# Summary statistics for the variables I will use in my regressions
+summary(select(FinalData, c('fmr_2bed', 'vacancy_rate', 'households_with_children', 'median_income', 'total_housing_units')))
+```
+
+---
+
+## 2. OLS Regression
+
+This is my baseline OLS regression using all four variables on the full county-level dataset. I regress 2-bedroom Fair Market Rent on vacancy rate, total housing units, and median income.
+
+```{r}
+# OLS regression on the full dataset
+reg_full <- lm(fmr_2bed ~ vacancy_rate + total_housing_units + median_income + households_with_children, data = FinalData)
+summary(reg_full)
+```
+
+---
+
+## 3. Filtered Regression (High Income Counties)
+
+Here I filter the dataset to only include counties where median household income is above $90,000. I want to see whether the relationship between vacancy rates and rent looks different in wealthier counties compared to the full sample.
+
+```{r}
+# Filter to high income counties only (median income above $90,000)
+FinalData_high_income <- filter(FinalData, median_income > 90000)
+
+cat("Number of counties in filtered dataset:", nrow(FinalData_high_income), "\n")
+```
+
+```{r}
+# OLS regression on the filtered high income dataset
+reg_filtered <- lm(fmr_2bed ~ vacancy_rate + total_housing_units + median_income + households_with_children, data = FinalData_high_income)
+summary(reg_filtered)
+```
+
+---
+
+## 4. Preferred Regression (Log-Transformed Income)
+
+My preferred regression uses the full dataset but log-transforms median income and rent. Income tends to have a non-linear relationship with rent — an extra dollar of income matters more at lower income levels than at higher ones. Log-transforming income captures this and typically improves model fit.
+
+```{r}
+# I logged income and fmr_2bed
+FinalData <- mutate(FinalData, log_income = log(median_income), log_fmr = log(fmr_2bed))
+
+# Preferred regression with log-transformed income
+reg_preferred <- lm(log_fmr ~ vacancy_rate + total_housing_units + log_income + households_with_children, data = FinalData)
+summary(reg_preferred)
+```
+
+---
+
+## 5. Stargazer Table
+
+The table below displays all three regressions side by side for easy comparison.
+
+```{r, results='asis'}
+#This table lets me create a singular table that lets me see all three of my regressions
+#I used claude for this section to put the stargazer table together
+stargazer(reg_full, reg_filtered, reg_preferred,
+          type             = "latex",
+          title            = "OLS Regression Results: Fair Market Rent (2-Bedroom)",
+          dep.var.caption  = "",
+          dep.var.labels = "2-Bedroom Fair Market Rent (USD)",
+          covariate.labels = c("Vacancy Rate (Percent)",
+                               "total housing units",
+                               "Median Income (USD)",
+                               "Log Median Income"),
+          column.labels    = c("Full Sample", "High Income Counties", "Log Income and log Rent"),
+          omit.stat        = c("f", "ser"),
+          digits           = 3,
+          notes            = "Data: HUD Fair Market Rent API and U.S. Census Bureau ACS 2023.",
+          notes.align      = "l")
+
+```
+```{r}
+library(tinytex)
+```
+
+---
